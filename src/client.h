@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <shared_mutex>
 
 #include <infiniband/verbs.h>
 
@@ -96,11 +97,31 @@ typedef struct _KVOpsCtx {
 } KVOpsCtx;
 
 class DMCClient {
-  // 本地缓存结构
-  std::list<std::pair<std::string, void*>> local_cache_list_;
-  std::unordered_map<std::string, std::list<std::pair<std::string, void*>>::iterator> local_cache_map_;
-  size_t local_cache_size_;
-  size_t local_cache_capacity_;
+  // 缓存条目结构（包含数据和元数据）
+  struct LocalCacheEntry {
+    void* data;         // 数据指针
+    uint32_t size;      // 数据大小
+    uint64_t last_used; // 最后访问时间戳
+    uint32_t access_cnt;// 访问计数器（用于LFU）
+
+    LocalCacheEntry(void* src, uint32_t s)
+        : data(malloc(s)), size(s), last_used(new_ts()), access_cnt(1) {
+      memcpy(data, src, s);
+    }
+
+    ~LocalCacheEntry() {
+      free(data);
+    }
+  };
+  // LRU链表（最新访问在头部）
+  std::list<std::pair<std::string, LocalCacheEntry*>> lru_list_;
+  // 哈希表加速查找（key_str -> list iterator）
+  std::unordered_map<std::string, std::list<std::pair<std::string, LocalCacheEntry*>>::iterator> cache_map_;
+  size_t current_size_;    // 当前缓存大小（字节）
+  size_t capacity_;        // 最大容量
+  mutable std::shared_mutex cache_mutex_; // 读写锁
+
+
 
   uint16_t my_sid_;
   uint16_t num_servers_;
@@ -221,10 +242,80 @@ class DMCClient {
   std::vector<uint32_t> expert_evict_cnt_;
 
  private:
-  // 新增方法：本地缓存操作
-  bool local_cache_get(void* key, uint32_t key_size, void** val);
-  void local_cache_put(void* key, uint32_t key_size, void* val, uint32_t val_size);
-  void local_cache_evict();
+  // 查询本地缓存
+  bool local_cache_get(void* key, uint32_t key_size, void** val, uint32_t* val_size) {
+    const std::string key_str = serialize_key(key, key_size);
+    std::shared_lock lock(cache_mutex_); // 读锁
+
+    const auto map_it = cache_map_.find(key_str);
+    if (map_it == cache_map_.end()) {
+      return false; // 缓存未命中
+    }
+
+    // 命中：更新访问信息并返回数据
+    const auto& list_it = map_it->second;
+    LocalCacheEntry* entry = list_it->second;
+    entry->last_used = new_ts();
+    entry->access_cnt++;
+
+    // 移动至LRU链表头部
+    lru_list_.splice(lru_list_.begin(), lru_list_, list_it);
+
+    *val = entry->data;
+    *val_size = entry->size;
+    return true;
+  }
+
+  // 将二进制key序列化为字符串
+  static std::string serialize_key(const void* key, const uint32_t key_size) {
+    auto bytes = static_cast<const char*>(key);
+    return {bytes, bytes + key_size};
+  }
+
+  // 插入或更新本地缓存
+  void local_cache_put(void* key, uint32_t key_size, void* val, uint32_t val_size) {
+    std::string key_str = serialize_key(key, key_size);
+    std::unique_lock lock(cache_mutex_); // 写锁
+
+    // 检查是否已存在
+    if (const auto map_it = cache_map_.find(key_str); map_it != cache_map_.end()) {
+      // 存在则更新：先删除旧条目
+      const LocalCacheEntry* old_entry = map_it->second->second;
+      current_size_ -= (key_str.size() + old_entry->size);
+      delete old_entry;
+      lru_list_.erase(map_it->second);
+      cache_map_.erase(map_it);
+    }
+
+    // 创建新条目
+    auto* new_entry = new LocalCacheEntry(val, val_size);
+    lru_list_.emplace_front(key_str, new_entry);
+    cache_map_[key_str] = lru_list_.begin();
+    current_size_ += (key_str.size() + new_entry->size);
+
+    // 触发淘汰检查
+    while (current_size_ > capacity_) {
+      local_cache_evict();
+    }
+  }
+
+  // 缓存淘汰策略（LRU）
+  void local_cache_evict() {
+    if (lru_list_.empty()) {
+      return;
+    }
+
+    // 淘汰链表尾部元素
+    auto&[fst, snd] = lru_list_.back();
+    const std::string& key_str = fst;
+    LocalCacheEntry* entry = snd;
+
+    // 更新元数据
+    current_size_ -= (key_str.size() + entry->size);
+    cache_map_.erase(key_str);
+    delete entry;
+    lru_list_.pop_back();
+  }
 
   int alloc_segment(KVOpsCtx* ctx);
   int connect_all_rc_qp();

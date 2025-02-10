@@ -172,6 +172,8 @@ typedef struct _DMCConfig {
 
   // more cliquemap threads
   uint32_t num_server_threads;
+
+  uint32_t local_cache_size;
 } DMCConfig;
 
 typedef struct _MrInfo {

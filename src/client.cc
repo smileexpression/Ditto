@@ -23,6 +23,10 @@
 //    Client使用DefaultHash计算键的哈希，定位远程哈希桶。
 //    若桶已满，触发淘汰逻辑（如FIFOHistory记录历史，自适应策略调整权重）。
 DMCClient::DMCClient(const DMCConfig* conf) {
+  current_size_ = 0;
+  capacity_ = conf->local_cache_size;
+  assert(capacity_ > 0);
+
   evict_bucket_cnt_.clear();
   srand(conf->server_id);
   my_sid_ = conf->server_id;
@@ -2531,17 +2535,19 @@ int DMCClient::kv_get(void* key,
                       uint32_t key_size,
                       __OUT void* val,
                       __OUT uint32_t* val_size) {
-  // 1. 先查询本地缓存
+  // 1. 先尝试本地缓存
   void* local_val = nullptr;
-  // 本地命中
-  if (local_cache_get(key, key_size, &local_val)) {
-    memcpy(val, local_val, *val_size);
-    return 0;
+  uint32_t local_size = 0;
+  if (local_cache_get(key, key_size, &local_val, &local_size)) {
+    memcpy(val, local_val, local_size);
+    *val_size = local_size;
+    return 0; // 本地命中
   }
 
-  // 2. 本地未命中，走远程逻辑
+  // 2. 本地未命中，查询远程缓存
   const int ret = kv_get_1s(key, key_size, val, val_size);
   if (ret == 0) {
+    // 3. 将远程数据写入本地缓存
     local_cache_put(key, key_size, val, *val_size);
   }
   return ret;
