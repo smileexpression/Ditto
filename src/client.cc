@@ -2520,17 +2520,6 @@ int DMCClient::kv_set_2s(void* key,
   return *(int*)((uint64_t)local_buf_ + block_size_ + sizeof(uint8_t));
 }
 
-void DMCClient::local_cache_evict() {
-  while (local_cache_size_ > local_cache_capacity_) {
-    auto [fst, snd] = local_cache_list_.back();
-    local_cache_map_.erase(fst);
-    local_cache_list_.pop_back();
-    local_cache_size_ -= sizeof(snd);
-    free(snd);
-  }
-}
-
-
 int DMCClient::kv_get(void* key,
                       uint32_t key_size,
                       __OUT void* val,
