@@ -2516,11 +2516,36 @@ int DMCClient::kv_set_2s(void* key,
   return *(int*)((uint64_t)local_buf_ + block_size_ + sizeof(uint8_t));
 }
 
+void DMCClient::local_cache_evict() {
+  while (local_cache_size_ > local_cache_capacity_) {
+    auto [fst, snd] = local_cache_list_.back();
+    local_cache_map_.erase(fst);
+    local_cache_list_.pop_back();
+    local_cache_size_ -= sizeof(snd);
+    free(snd);
+  }
+}
+
+
 int DMCClient::kv_get(void* key,
                       uint32_t key_size,
                       __OUT void* val,
                       __OUT uint32_t* val_size) {
-  return kv_get_1s(key, key_size, val, val_size);
+  // 1. 先查询本地缓存
+  void* local_val = nullptr;
+  // 本地命中
+  if (local_cache_get(key, key_size, &local_val)) {
+    memcpy(val, local_val, *val_size);
+    return 0;
+  }
+
+  // 2. 本地未命中，走远程逻辑
+  const int ret = kv_get_1s(key, key_size, val, val_size);
+  if (ret == 0) {
+    local_cache_put(key, key_size, val, *val_size);
+  }
+  return ret;
+  // return kv_get_1s(key, key_size, val, val_size);
 }
 
 int DMCClient::kv_p_set(void* key,

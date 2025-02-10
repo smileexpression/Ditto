@@ -96,6 +96,12 @@ typedef struct _KVOpsCtx {
 } KVOpsCtx;
 
 class DMCClient {
+  // 本地缓存结构
+  std::list<std::pair<std::string, void*>> local_cache_list_;
+  std::unordered_map<std::string, std::list<std::pair<std::string, void*>>::iterator> local_cache_map_;
+  size_t local_cache_size_;
+  size_t local_cache_capacity_;
+
   uint16_t my_sid_;
   uint16_t num_servers_;
   uint64_t server_base_addr_;
@@ -215,6 +221,11 @@ class DMCClient {
   std::vector<uint32_t> expert_evict_cnt_;
 
  private:
+  // 新增方法：本地缓存操作
+  bool local_cache_get(void* key, uint32_t key_size, void** val);
+  void local_cache_put(void* key, uint32_t key_size, void* val, uint32_t val_size);
+  void local_cache_evict();
+
   int alloc_segment(KVOpsCtx* ctx);
   int connect_all_rc_qp();
   int init_eviction(const DMCConfig* conf);
