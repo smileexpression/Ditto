@@ -8,6 +8,12 @@
 #include "ib.h"
 #include "nm.h"
 
+// 定义了一个UDPNetworkManager类，看起来处理网络通信，特别是使用UDP和RDMA（远程直接内存访问）技术。类中有成员变量如udp_sock_（UDP套接字）、ib_ctx_（InfiniBand上下文）、ib_pd_（保护域）等，表明这个类负责管理网络连接，包括创建和销毁队列对（QP）、处理消息发送和接收，以及执行RDMA操作如写入、读取、原子操作等。
+// 此外，还有一些RDMA操作的同步和异步方法，如rdma_write_sid_sync、rdma_read_sid_sync等，这些方法可能用于在远程内存之间高效传输数据。
+// 功能：通过UDP和RDMA实现高效通信，管理客户端与服务器之间的连接和数据传输。
+
+// UDPNMInitClient和UDPNMInitServer方法分别初始化客户端和服务器的网络配置。
+// 网络初始化：UDPNMInitClient和UDPNMInitServer分别初始化客户端和服务器的UDP套接字和InfiniBand资源（如保护域、完成队列CQ、队列对QP）。
 int UDPNetworkManager::UDPNMInitServer(const DMCConfig* conf) {
   int ret = 0;
   struct timeval timeout;
@@ -184,6 +190,7 @@ struct ibv_qp* UDPNetworkManager::create_rc_qp() {
   return ib_create_rc_qp(ib_pd_, &qp_init_attr);
 }
 
+// 连接管理：通过client_connect_one_rc_qp和nm_on_connect_new_qp建立和维护RC（可靠连接）类型的队列对（QP），用于RDMA通信。
 int UDPNetworkManager::client_connect_one_rc_qp(uint16_t dest_server_id,
                                                 __OUT MrInfo* mr_info) {
   int rc = 0;
@@ -296,6 +303,7 @@ int UDPNetworkManager::rdma_poll_recv_completion_async(struct ibv_wc* wc,
   return ibv_poll_cq(ib_recv_cq_, num_wc, wc);
 }
 
+// RDMA操作：支持同步/异步的RDMA写入（rdma_write_sid_sync）、读取（rdma_read_sid_sync）、原子操作（如CAS和FAA），以及批量操作（rdma_batch_read_sid_sync）。
 int UDPNetworkManager::rdma_write_sid_sync(uint16_t server,
                                            uint64_t remote_addr,
                                            uint32_t rkey,

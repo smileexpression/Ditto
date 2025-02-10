@@ -12,6 +12,16 @@
 #include <iostream>
 #include <vector>
 
+// DMCClient类：核心客户端，实现键值存储（SET/GET）和缓存淘汰。
+//  网络通信：使用RDMA（通过UDPNetworkManager）与服务器交互，支持内存读写、 CAS等原子操作。
+//  缓存淘汰策略：
+//    支持多种策略（如EVICT_SAMPLE、EVICT_PRECISE、EVICT_SAMPLE_ADAPTIVE等）。
+//    自适应策略（Adaptive）通过experts（多个优先级策略）动态调整权重（l_weights_），结合历史访问信息优化淘汰决策。
+//  键值操作：
+//    kv_set和kv_get通过RDMA读写远程内存，匹配哈希桶中的槽位（Slot），处理冲突和淘汰。
+//    使用CMS（Count-Min Sketch）跟踪访问频率，支持LFU等策略。
+//    Client使用DefaultHash计算键的哈希，定位远程哈希桶。
+//    若桶已满，触发淘汰逻辑（如FIFOHistory记录历史，自适应策略调整权重）。
 DMCClient::DMCClient(const DMCConfig* conf) {
   evict_bucket_cnt_.clear();
   srand(conf->server_id);
@@ -935,6 +945,7 @@ int DMCClient::evict_bucket_sample_naive(KVOpsCtx* ctx) {
   return 0;
 }
 
+// 淘汰策略的具体实现
 int DMCClient::evict_bucket_sample_adaptive(KVOpsCtx* ctx) {
   printd(L_DEBUG, "Evict Bucket Sample");
 
@@ -2026,6 +2037,7 @@ int DMCClient::evict_sample_adaptive_naive(KVOpsCtx* ctx) {
   return -1;
 }
 
+// 精确淘汰（EVICT_PRECISE）：使用优先级列表（RList）维护全局最小优先级项。
 int DMCClient::evict_precise(KVOpsCtx* ctx) {
   printd(L_DEBUG, "Evict precise!");
   int ret = 0;
@@ -2142,6 +2154,7 @@ int DMCClient::evict_sample_naive(KVOpsCtx* ctx) {
   return 0;
 }
 
+// 自适应淘汰（EVICT_SAMPLE_ADAPTIVE）：结合多个专家策略（如LRU、LFU），动态调整权重以优化命中率。
 int DMCClient::evict_sample_adaptive(KVOpsCtx* ctx) {
   printd(L_DEBUG, "Evict");
   int ret = 0;
@@ -2297,6 +2310,7 @@ int DMCClient::evict_sample_adaptive(KVOpsCtx* ctx) {
   return -1;
 }
 
+// 采样淘汰（EVICT_SAMPLE）：随机采样多个桶，选择优先级最低的项淘汰。
 int DMCClient::evict_sample(KVOpsCtx* ctx) {
   printd(L_DEBUG, "Evict");
   int ret = 0;

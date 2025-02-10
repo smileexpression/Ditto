@@ -1,6 +1,10 @@
 #include "fifo_history.h"
 #include "ib.h"
 
+// 实现了一个FIFO（先进先出）历史记录管理类`FIFOHistory`，用于跟踪缓存项的淘汰历史
+// 使用RDMA操作（如原子CAS、写操作）与远程内存交互，确保一致性
+// 功能：管理缓存项的淘汰历史，记录被淘汰项的元数据（如哈希值、频率、专家位图）
+// 应用场景：在自适应淘汰策略中，历史记录用于动态评估不同策略的效果，调整权重以优化命中率。
 FIFOHistory::FIFOHistory(uint32_t hist_size,
                          uint64_t index_base_raddr,
                          uint64_t hist_base_raddr,
@@ -23,6 +27,8 @@ FIFOHistory::FIFOHistory(uint32_t hist_size,
     memset((void*)hist_base_raddr, 0, occupy_size_);
 }
 
+// `insert`方法向历史记录中添加新条目
+// insert：通过RDMA原子操作（CAS）和批量写入，将淘汰项加入历史队列，并更新远程元数据。
 void FIFOHistory::insert(UDPNetworkManager* nm,
                          uint64_t target_slot_raddr,
                          uint64_t key_hash,
@@ -117,6 +123,8 @@ void FIFOHistory::insert(UDPNetworkManager* nm,
   assert(ret == 0);
 }
 
+// `try_evict`尝试淘汰旧条目
+// try_evict：尝试淘汰指定槽位，若成功则清空相关元数据
 int FIFOHistory::try_evict(UDPNetworkManager* nm,
                            uint64_t slot_raddr,
                            const Slot* slot) {

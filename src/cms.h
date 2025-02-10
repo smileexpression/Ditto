@@ -13,6 +13,7 @@
 #include <string.h>
 #include <time.h>
 
+// 一种概率数据结构，用于估计数据流中元素的频率。这在缓存系统中可能用于跟踪项目的访问频率，以支持某种淘汰策略，如LFU
 class CMS {
  private:
   uint64_t PRIME;

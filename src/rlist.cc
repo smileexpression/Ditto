@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <unistd.h>
 
+// 功能：维护一个基于优先级的远程链表，用于管理缓存条目的顺序。
 RList::RList(uint32_t num_slots,
              uint64_t base_addr,
              uint32_t rkey,
@@ -17,6 +18,8 @@ RList::RList(uint32_t num_slots,
              uint8_t type) {
   base_raddr_ = base_addr;
   num_slots_ = num_slots;
+
+  // 分片设计（USE_SHARD_PQUEUE）以优化并发性能。
 #ifdef USE_SHARD_PQUEUE
   // | ---slot entries--- | ---head entries--- | ---tail entries--- |
   // ---locks--- |
@@ -253,6 +256,7 @@ void RList::find_insert_place(UDPNetworkManager* nm,
   *(entry_raddr) = cur_entry_raddr;
 }
 
+// 提供插入（insert_before）、删除（delete_entry）和查找（find_insert_place）接口。
 void RList::insert_before(UDPNetworkManager* nm,
                           const RListEntry* target,
                           uint64_t target_raddr,
@@ -319,6 +323,8 @@ void RList::local_update(uint32_t slot_id, double prio) {
     printf("Should not be occupied slot!\n");
     abort();
   }
+
+  // 分片设计（USE_SHARD_PQUEUE）以优化并发性能。
 #ifdef USE_SHARD_PQUEUE
   uint32_t list_id = slot_id % NUM_PQUEUE_SHARDS;
   RListEntry* head = (RListEntry*)head_raddrs_[list_id];

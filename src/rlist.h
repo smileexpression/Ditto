@@ -6,6 +6,7 @@
 #include <float.h>
 #include <stdint.h>
 
+// 使用RListEntry结构存储优先级（priority）、前驱（prev）和后继（next）指针。
 typedef struct __attribute__((__packed__)) _RListEntry {
   double priority;
   uint32_t prev;

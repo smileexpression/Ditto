@@ -15,6 +15,8 @@
 #define TO64(x) (((U64_INT*)(x))->v)
 #define TO32(x) (((U32_INT*)(x))->v)
 
+// 实现了哈希表相关的功能，包括哈希函数、槽位（Slot）和桶（Bucket）的结构
+
 typedef struct U64_INT {
   uint64_t v;
 } U64_INT;
@@ -134,6 +136,7 @@ static uint64_t string_key_hash_computation(const void* data,
   return hash;
 }
 
+// 哈希函数（如`VariableLengthHash`）处理不同长度的键，生成64位哈希值
 static uint64_t VariableLengthHash(const void* data,
                                    uint64_t length,
                                    uint64_t seed) {

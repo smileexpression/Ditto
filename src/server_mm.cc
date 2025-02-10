@@ -10,9 +10,13 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+// 使用大页内存（MAP_HUGE_2MB）提升性能。
 #define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
 #define MAP_HUGE_1GB (30 << MAP_HUGE_SHIFT)
 
+// 功能：管理服务器的物理内存分配与释放。
+// 将内存划分为索引区（index_area）、状态区（stateful_area）和空闲区（free_space）。
+// 通过SegmentInfo跟踪内存段分配状态（free_segment_list_和used_segment_map_）。
 ServerMM::ServerMM(const DMCConfig* conf, struct ibv_pd* pd) {
   segment_size_ = conf->segment_size;
   base_addr_ = conf->server_base_addr;
@@ -52,6 +56,7 @@ ServerMM::ServerMM(const DMCConfig* conf, struct ibv_pd* pd) {
          free_space_addr_, free_space_len_);
 
   // register memory region
+  // 注册内存区域（ibv_reg_mr）供RDMA访问。
   int access_flag = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ |
                     IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_ATOMIC;
   mr_ = ibv_reg_mr(pd, data_, base_len_, access_flag);
@@ -70,6 +75,7 @@ ServerMM::ServerMM(const DMCConfig* conf, struct ibv_pd* pd) {
     free_segment_list_.push(info);
   }
 
+  // 支持动态扩展内存（elastic_mem_），按需调整预留段数量。
   if (elastic_mem_) {
 #ifdef ELA_MEM_TPT
     num_reserved_segments_ = num_segments_ / 2;

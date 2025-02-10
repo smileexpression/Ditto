@@ -52,6 +52,10 @@ static int parse_priority(const std::string& priority_str) {
   return -1;
 }
 
+// 包含配置加载函数（`load_config`），从JSON文件中读取DMC的配置参数（如角色、连接类型、服务器ID等）
+// load_config从JSON文件解析配置参数，包括角色（Server/Client）、连接类型（IB/ROCE）、哈希类型、淘汰策略等
+// 支持自适应淘汰策略的参数（如学习率learning_rate、历史记录大小history_size）
+// 1. 初始化配置：通过load_config加载参数，确定系统角色（Client/Server）、哈希函数、淘汰策略类型（如EVICT_SAMPLE_ADAPTIVE）。
 int load_config(const char* fname, __OUT DMCConfig* config) {
   std::fstream config_fs(fname);
   assert(config_fs.is_open());
@@ -190,6 +194,8 @@ int load_config(const char* fname, __OUT DMCConfig* config) {
   return 0;
 }
 
+// 提供网络通信相关的序列化和反序列化函数（如`serialize_udpmsg`、`deserialize_udpmsg`）
+// 序列化/反序列化函数（如serialize_udpmsg）处理网络消息的字节序转换，确保跨平台兼容性
 void serialize_udpmsg(__OUT UDPMsg* msg) {
   switch (msg->type) {
     case UDPMSG_REQ_CONNECT:
@@ -262,6 +268,8 @@ void deserialize_conn_info(__OUT ConnInfo* conn_info) {
   deserialize_mr_info(&conn_info->mr_info);
 }
 
+// 工具函数如`stick_this_thread_to_core`用于绑定线程到特定CPU核心，优化性能
+// stick_this_thread_to_core将线程绑定到指定CPU核心，减少上下文切换开销
 int stick_this_thread_to_core(int core_id) {
   int num_cores = sysconf(_SC_NPROCESSORS_CONF);
   if (core_id < 0 || core_id >= num_cores) {

@@ -204,6 +204,8 @@ typedef struct _UDPMsg {
   } body;
 } UDPMsg;
 
+// 时间戳相关函数（`new_ts`、`diff_ts_us`）用于处理时间逻辑
+// 时间戳函数（new_ts）用于追踪操作耗时，支持淘汰策略的时序判断
 static inline uint64_t new_ts() {
   struct timeval cur;
   gettimeofday(&cur, NULL);

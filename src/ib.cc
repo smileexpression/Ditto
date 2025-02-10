@@ -5,6 +5,8 @@
 #include "dmc_utils.h"
 #include "ib.h"
 
+// `ib.cc`和`ib.h`可能涉及InfiniBand网络通信的实现，包括队列对（QP）的创建和配置。`lw_history.h`可能实现了轻量级的历史记录管理，用于缓存淘汰策略
+// 功能：实现InfiniBand/RDMA的底层通信逻辑，支持高性能远程内存访问。
 static void dump_qp_info(const QPInfo* info, const char* msg) {
   printd(L_DEBUG, "%s qp_num: %d", msg, info->qp_num);
   printd(L_DEBUG, "%s lid: %x", msg, info->lid);
@@ -34,6 +36,7 @@ static int modify_qp_to_rts(struct ibv_qp* local_qp) {
   return 0;
 }
 
+// QP状态机：通过modify_qp_to_init、modify_qp_to_rtr、modify_qp_to_rts确保QP正确初始化。
 static int modify_qp_to_init(struct ibv_qp* qp, const QPInfo* local_qp_info) {
   struct ibv_qp_attr attr;
   int attr_mask;
@@ -88,6 +91,7 @@ static int modify_qp_to_rtr(struct ibv_qp* local_qp,
   return 0;
 }
 
+// ib_get_ctx：打开指定IB设备，获取上下文。
 struct ibv_context* ib_get_ctx(uint32_t dev_id, uint32_t port_id) {
   struct ibv_device** ib_dev_list;
   struct ibv_device* ib_dev;
@@ -106,11 +110,13 @@ struct ibv_context* ib_get_ctx(uint32_t dev_id, uint32_t port_id) {
   return ret;
 }
 
+// ib_create_rc_qp：创建可靠连接（RC）的队列对（QP）。
 struct ibv_qp* ib_create_rc_qp(struct ibv_pd* ib_pd,
                                struct ibv_qp_init_attr* qp_init_attr) {
   return ibv_create_qp(ib_pd, qp_init_attr);
 }
 
+// ib_connect_qp：配置QP状态（INIT → RTR → RTS），建立与远程QP的连接。
 int ib_connect_qp(struct ibv_qp* local_qp,
                   const QPInfo* local_qp_info,
                   const QPInfo* remote_qp_info,

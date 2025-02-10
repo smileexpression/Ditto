@@ -22,9 +22,13 @@ typedef struct __attribute__((__packed__)) _ObjHeader {
 
 #define OBJ_META_OFF (offsetof(ObjHeader, meta))
 
+// priority.h定义了一个Priority基类，以及多个派生类（如LRUPriority、LFUPriority、GDSFPriority等），每个类实现了不同的缓存替换策略。每个派生类重写了info_update_mask和parse_priority方法，用于计算对象的优先级，以决定在缓存满时哪个对象应该被替换出去。例如，LRUPriority（最近最少使用）根据访问时间戳计算优先级，而LFUPriority（最不经常使用）则根据访问频率。dmc_new_priority函数根据传入的eviction_prio参数创建相应的优先级策略实例。
+// 功能：定义多种缓存替换算法，用于在缓存空间不足时决定淘汰哪些对象。
 class Priority {
  public:
+  // info_update_mask：标识需要更新的对象元数据（如时间戳、访问频率）。
   virtual uint32_t info_update_mask(const SlotMeta* meta) = 0;
+  // parse_priority：根据对象的元数据（大小、访问时间、频率等）计算优先级。
   virtual double parse_priority(const SlotMeta* meta, uint8_t size) = 0;
   virtual void evict_callback(double evict_prio) {}
   virtual double get_counter_val(const SlotMeta* meta, uint8_t size) {
@@ -52,6 +56,7 @@ class LFUPriority : public Priority {
   }
 };
 
+// 综合考虑频率和对象大小
 class GDSFPriority : public Priority {
  private:
   double L_;
@@ -76,6 +81,7 @@ class GDSPriority : public Priority {
   void evict_callback(double evict_prio) { L_ = evict_prio; }
 };
 
+// 低干预替换策略
 class LIRSPriority : public Priority {
  public:
   uint32_t info_update_mask(const SlotMeta* meta) {
@@ -89,6 +95,7 @@ class LIRSPriority : public Priority {
   }
 };
 
+// 结合时间和频率的衰减模型
 class LRFUPriority : public Priority {
  private:
   float lambda_ = 0.5;
@@ -147,6 +154,7 @@ class LRUKPriority : public Priority {
   double get_counter(const SlotMeta* meta, uint8_t size) { return new_ts(); }
 };
 
+// 基于对象大小
 class SIZEPriority : public Priority {
  public:
   uint32_t info_update_mask(const SlotMeta* meta) { return UPD_TS | UPD_FREQ; }
@@ -163,6 +171,7 @@ class MRUPriority : public Priority {
   }
 };
 
+// 超bolic频率-时间比
 class HyperbolicPriority : public Priority {
  public:
   uint32_t info_update_mask(const SlotMeta* meta) { return UPD_FREQ; }

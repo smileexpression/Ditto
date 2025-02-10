@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <vector>
 
+// 功能：处理客户端请求，执行缓存操作（Get/Set）和内存管理。
 void* server_main(void* server_main_args) {
   ServerMainArgs* args = (ServerMainArgs*)server_main_args;
   Server* server_instance = args->server;
@@ -52,6 +53,7 @@ Server::Server(const DMCConfig* conf) {
   srand(server_id_);
   init_counters();
 
+  // 网络层：通过UDPNetworkManager接收UDP消息（如连接请求、内存分配请求）。
   nm_ = new UDPNetworkManager(conf);
 
   struct ibv_pd* pd = nm_->get_ib_pd();
@@ -151,6 +153,7 @@ Server::Server(const DMCConfig* conf) {
     }
   }
 
+  // 精确模式（EVICT_PRECISE）：使用优先级队列（prio_list_）直接淘汰最低优先级条目。
   if (eviction_type_ == EVICT_PRECISE) {
     priority_ = dmc_new_priority(conf->eviction_priority);
     uint64_t base_addr = mm_->get_base_addr() + HASH_SPACE_SIZE;
@@ -345,6 +348,7 @@ uint64_t Server::evict() {
   return evict_sample();
 }
 
+// 精确模式（EVICT_PRECISE）：使用优先级队列（prio_list_）直接淘汰最低优先级条目。
 uint64_t Server::evict_precise() {
 cliquemap_evict_retry:
   // find the slot with the lowest priority
@@ -463,6 +467,7 @@ int Server::evict_local_cmm(uint32_t worker_id) {
   return 0;
 }
 
+// Get：通过哈希表（kv_search_slot）查找键值对，返回数据。
 int Server::get(void* key,
                 uint32_t key_size,
                 __OUT void* val,
@@ -602,6 +607,7 @@ int Server::p_set(uint32_t worker_id,
   return 0;
 }
 
+// Set：分配内存存储键值对，更新哈希表，触发缓存替换策略。
 int Server::set(uint32_t worker_id,
                 void* key,
                 uint32_t key_size,
@@ -994,6 +1000,7 @@ int Server::server_on_recv_msg_merge(const struct ibv_wc* wc) {
   return 0;
 }
 
+// 支持多线程（worker_main）处理RDMA请求，通过轮询完成队列（ibv_poll_cq）实现高吞吐。
 void* Server::worker_main(uint32_t worker_id) {
   printd(L_INFO, "Worker main started!");
   int ret = 0;

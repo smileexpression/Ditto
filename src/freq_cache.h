@@ -9,6 +9,11 @@
 #include <unordered_map>
 #include <vector>
 
+// `freq_cache.h`看起来是一个频率缓存的管理类，用于跟踪键的访问频率
+// `FreqCache`类可能在自适应淘汰策略中用于合并高频访问的元数据更新，减少远程写入次数。
+// FreqCache类：用于合并高频访问键的元数据更新，减少远程写入开销。
+// 应用场景：在自适应淘汰策略中，减少对远程元数据的频繁更新（如LFU计数器），通过本地缓存合并操作。
+// 频率缓存：FreqCache合并高频键的更新，减少远程原子操作（如FAA）次数。
 class FreqCache {
  private:
   uint32_t cache_size_;
@@ -26,6 +31,7 @@ class FreqCache {
     return key.size() + sizeof(uint64_t) * 2;
   }
 
+  // evict：选择访问频率最低的键淘汰，优先保留高频项。
   std::pair<uint64_t, uint64_t> evict() {
     auto it_1 = cache_.begin();
     auto it_2 = it_1++;
@@ -41,6 +47,7 @@ class FreqCache {
     return ret;
   }
 
+  // add：将键及其远程地址加入缓存，若空间不足则淘汰访问频率较低的键。
   void add(std::string key,
            uint64_t r_addr,
            std::vector<std::pair<uint64_t, uint64_t>>& target_freq_cnters) {

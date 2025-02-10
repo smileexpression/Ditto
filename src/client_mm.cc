@@ -6,6 +6,7 @@
 #include "client_mm.h"
 #include "debug.h"
 
+// 管理远程内存段（RemoteSegment），支持添加和释放内存段
 ClientMM::ClientMM(const DMCConfig* conf) {
   segment_size_ = conf->segment_size;
   remote_segment_list_.clear();
@@ -15,6 +16,7 @@ ClientMM::~ClientMM() {
   remote_segment_list_.clear();
 }
 
+// 添加内存段
 void ClientMM::add_segment(uint64_t r_addr, uint32_t rkey, uint16_t server) {
   for (int i = 0; i < remote_segment_list_.size(); i++) {
     if (remote_segment_list_[i].addr == r_addr) {
@@ -29,6 +31,7 @@ void ClientMM::add_segment(uint64_t r_addr, uint32_t rkey, uint16_t server) {
   remote_segment_list_.push_back(new_segment);
 }
 
+// 继承自ClientMM，以固定大小的块（RemoteBlock）分配内存
 ClientUniformMM::ClientUniformMM(const DMCConfig* conf) : ClientMM(conf) {
   uni_block_size_ = conf->block_size;
   free_block_list_ = std::queue<RemoteBlock>();
@@ -39,6 +42,7 @@ ClientUniformMM::~ClientUniformMM() {
   return;
 }
 
+// 将远程内存段分割成块，并加入空闲列表
 void ClientUniformMM::add_segment(uint64_t r_addr,
                                   uint32_t rkey,
                                   uint16_t server) {
@@ -55,6 +59,7 @@ void ClientUniformMM::add_segment(uint64_t r_addr,
   }
 }
 
+// 分配逻辑：将每个内存段分割为统一大小的块，通过队列（free_block_list_）管理空闲块。
 int ClientUniformMM::alloc(uint32_t size, __OUT RemoteBlock* r_block) {
   if (size > uni_block_size_) {
     printd(L_ERROR, "Unsupported block size %d", size);
@@ -99,6 +104,7 @@ uint64_t ClientUniformMM::get_free_size() {
   return totoal_size - allocated_size;
 }
 
+// 淘汰检查：通过check_integrity验证内存块总数的一致性，need_amortize判断是否需要触发内存回收。
 bool ClientUniformMM::check_integrity() {
   uint64_t sum = used_block_map_.size() + free_block_list_.size();
   uint64_t total =

@@ -21,6 +21,8 @@ typedef union __attribute__((__packed__)) _SlotMeta {
   } acc_info;
 } SlotMeta;
 
+// 核心结构：
+//  Slot：表示哈希表中的一个槽位，包含指纹（fp）、键值长度（kv_len）和指向数据的指针（pointer）。
 typedef struct __attribute__((__packed__)) _Slot {
   struct {
     uint8_t fp;
@@ -40,6 +42,7 @@ typedef struct __attribute__((__packed__)) _Slot {
 #define SLOTM_INFO_CNTR_OFF (offsetof(SlotMeta, acc_info.counter))
 #define SLOTM_INFO_FREQ_OFF (offsetof(SlotMeta, acc_info.freq))
 
+//  Bucket：由多个Slot组成的哈希桶，处理哈希冲突。
 typedef Slot Bucket[HASH_BUCKET_ASSOC_NUM];
 typedef Bucket Table[HASH_NUM_BUCKETS];
 
@@ -49,12 +52,16 @@ class DMCHash {
   virtual uint64_t hash_func2(const void* data, uint64_t length) = 0;
 };
 
+// `DefaultHash`类提供了默认的哈希函数
+// 基于XXHash算法的高效哈希，支持变长键
 class DefaultHash : public DMCHash {
  public:
   uint64_t hash_func1(const void* data, uint64_t length);
   uint64_t hash_func2(const void* data, uint64_t length);
 };
 
+// `DumbHash`用于测试（返回固定值）
+// 用于测试的简单哈希（返回固定值）
 class DumbHash : public DMCHash {
   // a hash function that always return the same value for testing
  public:
@@ -62,6 +69,8 @@ class DumbHash : public DMCHash {
   uint64_t hash_func2(const void* data, uint64_t length) { return 666; }
 };
 
+// `HashIndexConvert64To48Bits`和`HashIndexConvert48To64Bits`用于地址转换，可能是为了节省存储空间
+// 用于将64位地址压缩为48位（节省存储）并恢复，可能适配硬件限制或优化内存布局
 static inline uint64_t HashIndexConvert48To64Bits(const uint8_t* addr) {
   uint64_t ret = 0;
   return ret | ((uint64_t)addr[0] << 40) | ((uint64_t)addr[1] << 32) |
